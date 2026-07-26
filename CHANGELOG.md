@@ -1,3 +1,7 @@
+## 0.1.1
+
+- Fixed package repository metadata for pub.dev verification.
+
 ## 0.1.0
 
 - Initial preview release.
