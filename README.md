@@ -19,7 +19,7 @@ add actions without modifying this package.
 
 ```yaml
 dependencies:
-  fcm_actions: ^0.1.0
+  fcm_actions: ^0.1.2
 ```
 
 Run `flutterfire configure` in the application. On iOS, enable the **Push

@@ -1,3 +1,7 @@
+## 0.1.2
+
+- Bumped package version and changelog for a clean pub.dev republish.
+
 ## 0.1.1
 
 - Fixed package repository metadata for pub.dev verification.
