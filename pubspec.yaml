@@ -1,7 +1,9 @@
 name: fcm_actions
 description: Extensible, testable notification actions for Firebase Cloud Messaging on Android and iOS.
 version: 0.1.0
-homepage: https://pub.dev/packages/fcm_actions
+homepage: https://github.com/AmrSaad14/fcm_actions
+repository: https://github.com/AmrSaad14/fcm_actions
+issue_tracker: https://github.com/AmrSaad14/fcm_actions/issues
 topics:
   - firebase
   - notifications
