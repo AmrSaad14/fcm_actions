@@ -5,7 +5,8 @@ import 'package:flutter/foundation.dart';
 
 import '../core/exceptions.dart';
 import '../models/notification_permission.dart';
-import 'background_dispatcher.dart';
+import 'background_message_handler_stub.dart'
+    if (dart.library.io) 'local_notifications_io.dart';
 import 'platform_gateways.dart';
 
 final _topicPattern = RegExp(r'^[a-zA-Z0-9\-_.~%]{1,900}$');

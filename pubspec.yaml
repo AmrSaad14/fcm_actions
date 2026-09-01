@@ -1,6 +1,6 @@
 name: fcm_actions
 description: Production-ready FCM actions, tokens, topics, and routing for Flutter on Android, iOS, macOS, and web.
-version: 1.0.0
+version: 1.0.1
 homepage: https://github.com/AmrSaad14/fcm_actions
 repository: https://github.com/AmrSaad14/fcm_actions
 issue_tracker: https://github.com/AmrSaad14/fcm_actions/issues

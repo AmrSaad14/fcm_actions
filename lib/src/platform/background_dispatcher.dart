@@ -3,24 +3,13 @@ import 'dart:convert';
 import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../actions/action_registry.dart';
-import '../core/contracts.dart';
 import '../core/fcm_actions_config.dart';
 import '../models/configuration_models.dart';
-import '../models/enums.dart';
 import '../models/events.dart';
 import '../models/notification_action.dart';
-import '../models/notification_message.dart';
-import '../parser/notification_parser.dart';
-import '../services/replay_guard.dart';
-import '../utils/platform_utils.dart';
-import 'local_notifications_gateway.dart';
 
 const String _configurationKey = 'fcm_actions.background_config.v1';
 const String _pendingEventsKey = 'fcm_actions.pending_events.v1';
@@ -110,7 +99,8 @@ final class BackgroundDispatcher {
     }
   }
 
-  static Future<void> _appendPending(NotificationEvent event) async {
+  /// Persists a background notification for the main isolate.
+  static Future<void> appendPendingNotification(NotificationEvent event) async {
     final preferences = SharedPreferencesAsync();
     final encoded = await preferences.getString(_pendingEventsKey);
     final list = <Object?>[];
@@ -127,9 +117,8 @@ final class BackgroundDispatcher {
     await preferences.setString(_pendingEventsKey, jsonEncode(list));
   }
 
-  static Future<void> _appendPendingAction(
-    NotificationActionEvent event,
-  ) async {
+  /// Persists a background action for the main isolate.
+  static Future<void> appendPendingAction(NotificationActionEvent event) async {
     final preferences = SharedPreferencesAsync();
     final encoded = await preferences.getString(_pendingActionsKey);
     final list = <Object?>[];
@@ -146,7 +135,8 @@ final class BackgroundDispatcher {
     await preferences.setString(_pendingActionsKey, jsonEncode(list));
   }
 
-  static Future<Map<String, Object?>?> _readConfiguration() async {
+  /// Reads isolate-safe configuration persisted by [configure].
+  static Future<Map<String, Object?>?> readConfiguration() async {
     final encoded = await SharedPreferencesAsync().getString(_configurationKey);
     if (encoded == null) return null;
     final value = jsonDecode(encoded);
@@ -176,7 +166,8 @@ final class BackgroundDispatcher {
     if (options.appGroupId != null) 'appGroupId': options.appGroupId,
   };
 
-  static FirebaseOptions _firebaseOptionsFromJson(Map<String, Object?> json) =>
+  /// Restores [FirebaseOptions] persisted for a background isolate.
+  static FirebaseOptions firebaseOptionsFromJson(Map<String, Object?> json) =>
       FirebaseOptions(
         apiKey: json['apiKey']! as String,
         appId: json['appId']! as String,
@@ -193,159 +184,4 @@ final class BackgroundDispatcher {
         iosBundleId: json['iosBundleId'] as String?,
         appGroupId: json['appGroupId'] as String?,
       );
-}
-
-@pragma('vm:entry-point')
-Future<void> fcmActionsBackgroundMessageHandler(RemoteMessage remote) async {
-  try {
-    WidgetsFlutterBinding.ensureInitialized();
-    DartPluginRegistrant.ensureInitialized();
-    final config = await BackgroundDispatcher._readConfiguration();
-    if (config == null) return;
-    if (Firebase.apps.isEmpty) {
-      final optionsValue = config['firebaseOptions'];
-      await Firebase.initializeApp(
-        name: config['firebaseAppName'] as String?,
-        options: optionsValue is Map<Object?, Object?>
-            ? BackgroundDispatcher._firebaseOptionsFromJson(
-                optionsValue.map(
-                  (key, value) => MapEntry(key.toString(), value),
-                ),
-              )
-            : null,
-      );
-    }
-
-    final registry = ActionRegistry();
-    final actionValues = config['actions'];
-    if (actionValues is List) {
-      registry.registerAll(
-        actionValues.whereType<Map<Object?, Object?>>().map(
-          (value) => NotificationAction.fromJson(
-            value.map((key, item) => MapEntry(key.toString(), item)),
-          ),
-        ),
-      );
-    }
-    final parser = NotificationParser(
-      maxPayloadBytes: config['maxPayloadBytes'] as int? ?? 32768,
-      defaultChannelId:
-          config['defaultChannelId'] as String? ?? 'fcm_actions_default',
-      resolveAction: registry.find,
-    );
-    final message = parser.parseRemoteMessage(remote);
-    final event = NotificationEvent(
-      message: message,
-      timestamp: DateTime.now().toUtc(),
-      platform: currentNotificationPlatform,
-      state: NotificationState.background,
-      rawJson: message.rawJson,
-    );
-    await BackgroundDispatcher._appendPending(event);
-
-    // Notification/mixed messages are already rendered by the OS in the
-    // background. Only data-only, non-silent messages need local fallback.
-    if (remote.notification == null && !message.silent) {
-      final channels = (config['channels'] as List? ?? const <Object?>[])
-          .whereType<Map<Object?, Object?>>()
-          .map(
-            (value) => NotificationChannel.fromJson(
-              value.map((key, item) => MapEntry(key.toString(), item)),
-            ),
-          )
-          .toList();
-      NotificationChannel? channel;
-      for (final item in channels) {
-        if (item.id == message.channelId) {
-          channel = item;
-          break;
-        }
-      }
-      final fallback = channel ?? NotificationChannel.defaultChannel;
-      final local = FlutterLocalNotificationsGateway();
-      await local.initialize(
-        defaultAndroidIcon: config['icon'] as String? ?? '@mipmap/ic_launcher',
-        requestPermission: false,
-        categoryTemplates: <NotificationMessage>[message],
-        onResponse: (_) async {},
-      );
-      await local.createChannels(<NotificationChannel>[fallback]);
-      await local.show(message, fallback);
-    }
-  } on Object {
-    // Background callbacks must never terminate the host application.
-  }
-}
-
-@pragma('vm:entry-point')
-void fcmActionsBackgroundNotificationResponse(
-  NotificationResponse response,
-) async {
-  try {
-    WidgetsFlutterBinding.ensureInitialized();
-    DartPluginRegistrant.ensureInitialized();
-    if (response.payload == null) return;
-    final message = NotificationMessage.fromJson(
-      Map<String, Object?>.from(jsonDecode(response.payload!) as Map),
-    );
-    final event = NotificationActionEvent(
-      actionId: response.actionId ?? 'default',
-      notificationId: response.id ?? message.notificationId,
-      timestamp: DateTime.now().toUtc(),
-      message: message,
-      platform: currentNotificationPlatform,
-      state: NotificationState.background,
-      payload: message.data,
-      rawJson: message.rawJson,
-      replyText: response.input,
-      fromBackground: true,
-    );
-    final config = await BackgroundDispatcher._readConfiguration();
-    if (config == null) return;
-    final claimed =
-        await ReplayGuard(
-          window: Duration(
-            milliseconds:
-                config['replayWindowMs'] as int? ??
-                const Duration(days: 7).inMilliseconds,
-          ),
-        ).claim(
-          'action:${event.notificationId}:${event.actionId}:'
-          '${event.message.messageId}',
-          event.timestamp,
-        );
-    if (!claimed) return;
-    final rawHandle = config['callbackHandle'];
-    if (rawHandle is int) {
-      final callback = PluginUtilities.getCallbackFromHandle(
-        CallbackHandle.fromRawHandle(rawHandle),
-      );
-      if (callback is NotificationActionCallback) {
-        try {
-          await callback(event);
-          return;
-        } on Object {
-          await BackgroundDispatcher._appendPendingAction(event);
-        }
-      } else {
-        await BackgroundDispatcher._appendPendingAction(event);
-      }
-    } else {
-      await BackgroundDispatcher._appendPendingAction(event);
-    }
-    await BackgroundDispatcher._appendPending(
-      NotificationEvent(
-        message: message,
-        timestamp: event.timestamp,
-        platform: event.platform,
-        state: event.state,
-        interaction: response.input == null
-            ? NotificationInteraction.actionTap
-            : NotificationInteraction.reply,
-        rawJson: event.rawJson,
-      ),
-    );
-  } on Object {
-    // The platform owns this isolate; never allow user callbacks to crash it.
-  }
 }

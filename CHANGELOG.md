@@ -1,3 +1,9 @@
+## 1.0.1
+
+- Restored full pub.dev platform points by keeping `flutter_local_notifications`
+  (and its Windows `dart:io` import) behind IO-only conditional imports so the
+  declared web target is WASM-compatible.
+
 ## 1.0.0
 
 - Marked the package stable after the 0.1 preview.

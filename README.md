@@ -19,7 +19,7 @@ so applications can add actions without modifying this package.
 
 ```yaml
 dependencies:
-  fcm_actions: ^1.0.0
+  fcm_actions: ^1.0.1
 ```
 
 Run `flutterfire configure` in the application. On iOS, enable the **Push
@@ -83,7 +83,9 @@ await FcmActions.unsubscribeFromTopic('orders');
 
 On Apple platforms the package waits for an APNs token before calling
 `getToken`. On web, pass `vapidKey` to `initialize` or `getToken`. Topics are
-not supported on web. `initialize` also returns `permission`, `apnsToken`, and
+not supported on web. Remote web notifications are displayed by the browser /
+FCM service worker; `FcmActions.show` is a no-op there so the package stays
+WASM-compatible. `initialize` also returns `permission`, `apnsToken`, and
 `supported`. Use `SilentFcmActionsLogger` when you do not want debug output.
 
 Actions can also be registered at runtime:
