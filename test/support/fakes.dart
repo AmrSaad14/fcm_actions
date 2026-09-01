@@ -9,11 +9,24 @@ final class FakeMessagingGateway implements MessagingGateway {
       StreamController<RemoteMessage>.broadcast();
   final StreamController<RemoteMessage> opened =
       StreamController<RemoteMessage>.broadcast();
+  final StreamController<String> tokens = StreamController<String>.broadcast();
 
   RemoteMessage? initialMessage;
+  String? token = 'fake-fcm-token';
+  String? apnsToken;
+  String? vapidKey;
   bool permissionRequested = false;
   bool presentationConfigured = false;
   bool backgroundRegistered = false;
+  bool supported = true;
+  bool tokenDeleted = false;
+  NotificationPermission permission = const NotificationPermission(
+    status: NotificationAuthorization.authorized,
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+  final Set<String> topics = <String>{};
 
   @override
   Stream<RemoteMessage> get foregroundMessages => foreground.stream;
@@ -22,10 +35,21 @@ final class FakeMessagingGateway implements MessagingGateway {
   Stream<RemoteMessage> get openedMessages => opened.stream;
 
   @override
+  Stream<String> get tokenRefresh => tokens.stream;
+
+  @override
   Future<RemoteMessage?> getInitialMessage() async => initialMessage;
 
   @override
-  Future<void> requestPermission() async => permissionRequested = true;
+  Future<NotificationPermission> requestPermission(
+    NotificationPermissionRequest request,
+  ) async {
+    permissionRequested = true;
+    return permission;
+  }
+
+  @override
+  Future<NotificationPermission> getPermissionStatus() async => permission;
 
   @override
   Future<void> configureForegroundPresentation() async =>
@@ -34,9 +58,34 @@ final class FakeMessagingGateway implements MessagingGateway {
   @override
   void registerBackgroundHandler() => backgroundRegistered = true;
 
+  @override
+  Future<String?> getToken({String? vapidKey}) async {
+    this.vapidKey = vapidKey;
+    return token;
+  }
+
+  @override
+  Future<String?> getAPNSToken() async => apnsToken;
+
+  @override
+  Future<void> deleteToken() async {
+    tokenDeleted = true;
+    token = null;
+  }
+
+  @override
+  Future<void> subscribeToTopic(String topic) async => topics.add(topic);
+
+  @override
+  Future<void> unsubscribeFromTopic(String topic) async => topics.remove(topic);
+
+  @override
+  Future<bool> isSupported() async => supported;
+
   Future<void> dispose() async {
     await foreground.close();
     await opened.close();
+    await tokens.close();
   }
 }
 

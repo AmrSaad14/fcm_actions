@@ -10,5 +10,7 @@ export 'src/handlers/notification_action_handler.dart';
 export 'src/models/configuration_models.dart';
 export 'src/models/enums.dart';
 export 'src/models/events.dart';
+export 'src/models/fcm_actions_init_result.dart';
 export 'src/models/notification_action.dart';
 export 'src/models/notification_message.dart';
+export 'src/models/notification_permission.dart';

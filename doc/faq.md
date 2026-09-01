@@ -20,8 +20,16 @@ sets are available when the package renders a local/data notification.
 
 ## Do topic and condition messages require another API?
 
-No. Topics and conditions affect server-side recipient selection. Their client
-payload is parsed through the same notification/data/mixed path.
+Incoming topic and condition payloads are parsed through the same
+notification/data/mixed path. To change which topics this device is subscribed
+to, call `FcmActions.subscribeToTopic` / `unsubscribeFromTopic`. Those APIs are
+not available on web.
+
+## How do I get the FCM token?
+
+`FcmActions.initialize` returns it on `FcmActionsInitResult.token`. Listen to
+`FcmActions.onTokenRefresh` for rotations, or call `FcmActions.getToken()`. On
+iOS and macOS the package waits for an APNs token first.
 
 ## Are killed and force-stopped apps guaranteed to receive data messages?
 

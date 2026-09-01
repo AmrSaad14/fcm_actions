@@ -1,5 +1,16 @@
 # Migration guide
 
+## From 0.1.x
+
+`1.0.0` is API-compatible for existing `initialize` callers. New optional
+arguments and a returned `FcmActionsInitResult` can be ignored. Replace any
+direct `FirebaseMessaging.instance.getToken` / `subscribeToTopic` usage with
+the matching `FcmActions` methods so Apple APNs readiness and topic validation
+stay in one place.
+
+`NotificationPlatform` now includes `macos` and `web`. Update exhaustive
+switches.
+
 ## From direct Firebase Messaging usage
 
 Keep Firebase project files and server payloads. Remove application listeners

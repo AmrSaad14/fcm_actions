@@ -119,4 +119,37 @@ void main() {
 
     expect((await dismissalFuture).message.notificationId, 20);
   });
+
+  test('returns token and permission from initialize', () {
+    expect(client.lastResult?.token, 'fake-fcm-token');
+    expect(client.lastResult?.authorized, isTrue);
+    expect(client.lastResult?.supported, isTrue);
+  });
+
+  test('subscribes and unsubscribes from topics', () async {
+    await client.subscribeToTopic('orders');
+    expect(messaging.topics, contains('orders'));
+    await client.unsubscribeFromTopic('orders');
+    expect(messaging.topics, isEmpty);
+  });
+
+  test('exposes token refresh and permission status', () async {
+    final refresh = client.onTokenRefresh.first;
+    messaging.tokens.add('rotated-token');
+    expect(await refresh, 'rotated-token');
+    expect((await client.getPermissionStatus()).granted, isTrue);
+    await client.deleteToken();
+    expect(messaging.tokenDeleted, isTrue);
+  });
+
+  test('unregisters actions', () {
+    client.registerAction(const NotificationAction(id: 'temp', title: 'Temp'));
+    client.unregisterAction('temp');
+    expect(
+      () => client.parse(<String, Object?>{
+        'actions': <Object?>['temp'],
+      }),
+      throwsA(isA<InvalidNotificationPayloadException>()),
+    );
+  });
 }

@@ -26,6 +26,8 @@
 - Do not add another Firebase background message handler.
 - Test on physical iOS and Android devices; simulators do not reproduce all
   push and process-kill behavior.
+- Send `FcmActionsInitResult.token` to your backend and listen to
+  `onTokenRefresh` so rotated tokens stay registered.
 
 ## Channels and categories
 

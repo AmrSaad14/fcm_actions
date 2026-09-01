@@ -1,25 +1,25 @@
 # fcm_actions
 
-Extensible, testable notification actions for Firebase Cloud Messaging on
-Android and iOS.
+Production-ready notification actions, tokens, topics, and routing for Firebase
+Cloud Messaging on Android, iOS, macOS, and web.
 
 `fcm_actions` normalizes FCM payloads, renders data messages, registers Android
-channels and iOS categories, routes taps, handles inline replies, and exposes
-typed event streams. Action IDs remain strings by design, so applications can
-add actions without modifying this package.
+channels and Apple categories, routes taps, handles inline replies, manages the
+FCM token, and exposes typed event streams. Action IDs remain strings by design,
+so applications can add actions without modifying this package.
 
 ## Requirements
 
 - Flutter 3.41 or newer
 - Dart 3.11 or newer
-- Android and iOS
+- Android, iOS, macOS, or web
 - A Firebase project configured for the consuming application
 
 ## Installation
 
 ```yaml
 dependencies:
-  fcm_actions: ^0.1.2
+  fcm_actions: ^1.0.0
 ```
 
 Run `flutterfire configure` in the application. On iOS, enable the **Push
@@ -48,7 +48,7 @@ dependencies {
 ```dart
 final navigatorKey = GlobalKey<NavigatorState>();
 
-await FcmActions.initialize(
+final result = await FcmActions.initialize(
   navigatorKey: navigatorKey,
   actions: const [
     NotificationAction(id: 'accept', title: 'Accept'),
@@ -62,8 +62,29 @@ await FcmActions.initialize(
   },
 );
 
+if (result.token != null) {
+  await api.registerDeviceToken(result.token!);
+}
+
+FcmActions.onTokenRefresh.listen(api.registerDeviceToken);
+
 runApp(MaterialApp(navigatorKey: navigatorKey));
 ```
+
+## Tokens and topics
+
+```dart
+final token = await FcmActions.getToken();
+final permission = await FcmActions.getPermissionStatus();
+
+await FcmActions.subscribeToTopic('orders');
+await FcmActions.unsubscribeFromTopic('orders');
+```
+
+On Apple platforms the package waits for an APNs token before calling
+`getToken`. On web, pass `vapidKey` to `initialize` or `getToken`. Topics are
+not supported on web. `initialize` also returns `permission`, `apnsToken`, and
+`supported`. Use `SilentFcmActionsLogger` when you do not want debug output.
 
 Actions can also be registered at runtime:
 
@@ -120,6 +141,7 @@ FcmActions.onReply.listen((event) => debugPrint(event.replyText));
 FcmActions.onForegroundMessage.listen((event) {});
 FcmActions.onBackgroundMessage.listen((event) {});
 FcmActions.onOpenedApp.listen((event) {});
+FcmActions.onTokenRefresh.listen((token) {});
 ```
 
 `NotificationActionEvent` includes the action ID, normalized payload,

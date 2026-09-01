@@ -10,7 +10,9 @@ import '../channels/channel_registry.dart';
 import '../models/configuration_models.dart';
 import '../models/enums.dart';
 import '../models/events.dart';
+import '../models/fcm_actions_init_result.dart';
 import '../models/notification_message.dart';
+import '../models/notification_permission.dart';
 import '../navigation/notification_navigator.dart';
 import '../parser/notification_parser.dart';
 import '../platform/background_dispatcher.dart';
@@ -25,6 +27,7 @@ import 'contracts.dart';
 import 'exceptions.dart';
 import 'fcm_actions_config.dart';
 
+/// Orchestrates parsing, display, routing, retries, and platform adapters.
 final class NotificationEngine with WidgetsBindingObserver {
   NotificationEngine({
     required this.config,
@@ -58,30 +61,51 @@ final class NotificationEngine with WidgetsBindingObserver {
     );
   }
 
+  /// Initialization options.
   final FcmActionsConfig config;
+
+  /// Registered action definitions and handlers.
   final ActionRegistry actions;
+
+  /// Registered Android channels.
   final ChannelRegistry channels;
+
+  /// FCM platform adapter.
   final MessagingGateway messaging;
+
+  /// Local notification platform adapter.
   final LocalNotificationsGateway localNotifications;
+
+  /// Typed event streams.
   final FcmActionsEventBus events;
   final ReplayGuard _replayGuard;
   final ActionQueue _actionQueue;
+
+  /// Named-route mapper.
   final NotificationNavigator navigator;
+
+  /// Payload normalizer.
   late final NotificationParser parser;
   final List<StreamSubscription<Object?>> _subscriptions =
       <StreamSubscription<Object?>>[];
   bool _initialized = false;
   bool _disposed = false;
 
+  /// Last successful initialize result.
+  FcmActionsInitResult? lastResult;
+
+  /// Whether [initialize] completed.
   bool get isInitialized => _initialized;
 
-  Future<void> initialize() async {
+  Future<FcmActionsInitResult> initialize() async {
     if (_disposed) {
       throw const FcmActionsInitializationException(
         'A disposed FcmActionsClient cannot be initialized.',
       );
     }
-    if (_initialized) return;
+    if (_initialized) {
+      return lastResult ?? const FcmActionsInitResult.unavailable();
+    }
     try {
       WidgetsFlutterBinding.ensureInitialized();
       await _initializeFirebase();
@@ -102,7 +126,7 @@ final class NotificationEngine with WidgetsBindingObserver {
         onResponse: _handleLocalResponse,
       );
       await localNotifications.createChannels(channels.channels.values);
-      if (config.requestPermission) await messaging.requestPermission();
+      final permission = await _resolvePermission();
       await messaging.configureForegroundPresentation();
 
       _subscriptions
@@ -118,6 +142,15 @@ final class NotificationEngine with WidgetsBindingObserver {
                 unawaited(_handleOpened(message, NotificationState.resumed)),
             onError: _streamError,
           ),
+        )
+        ..add(
+          messaging.tokenRefresh.listen(
+            (_) => config.logger.log(
+              FcmLogLevel.debug,
+              'FCM registration token refreshed.',
+            ),
+            onError: _streamError,
+          ),
         );
       WidgetsBinding.instance.addObserver(this);
       _initialized = true;
@@ -129,6 +162,13 @@ final class NotificationEngine with WidgetsBindingObserver {
       }
       if (localLaunch != null) await _handleLocalResponse(localLaunch);
       await retryPendingActions();
+      lastResult = FcmActionsInitResult(
+        permission: permission,
+        token: await _fetchToken(),
+        apnsToken: await _fetchApnsToken(),
+        supported: await _isSupported(),
+      );
+      return lastResult!;
     } on FcmActionsException {
       rethrow;
     } on Object catch (error, stackTrace) {
@@ -142,6 +182,48 @@ final class NotificationEngine with WidgetsBindingObserver {
         'Could not initialize notification services.',
         cause: error,
       );
+    }
+  }
+
+  Future<NotificationPermission> _resolvePermission() async {
+    if (config.requestPermission) {
+      return messaging.requestPermission(config.permissionRequest);
+    }
+    try {
+      return await messaging.getPermissionStatus();
+    } on Object {
+      return NotificationPermission.undetermined;
+    }
+  }
+
+  Future<String?> _fetchToken() async {
+    if (!config.fetchTokenOnInitialize) return null;
+    try {
+      return await messaging.getToken(vapidKey: config.vapidKey);
+    } on Object catch (error, stackTrace) {
+      config.logger.log(
+        FcmLogLevel.warning,
+        'Could not fetch the FCM registration token.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return null;
+    }
+  }
+
+  Future<String?> _fetchApnsToken() async {
+    try {
+      return await messaging.getAPNSToken();
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<bool> _isSupported() async {
+    try {
+      return await messaging.isSupported();
+    } on Object {
+      return true;
     }
   }
 
@@ -444,5 +526,6 @@ final class NotificationEngine with WidgetsBindingObserver {
     await events.dispose();
     _disposed = true;
     _initialized = false;
+    lastResult = null;
   }
 }

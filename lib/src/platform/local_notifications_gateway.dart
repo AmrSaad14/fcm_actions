@@ -48,23 +48,27 @@ final class FlutterLocalNotificationsGateway
     return _convert(response, launchedApp: true);
   }
 
-  Future<void> _initializePlugin({required bool requestPermission}) =>
-      _plugin.initialize(
-        settings: InitializationSettings(
-          android: AndroidInitializationSettings(_icon),
-          iOS: DarwinInitializationSettings(
-            requestAlertPermission: requestPermission,
-            requestBadgePermission: requestPermission,
-            requestSoundPermission: requestPermission,
-            notificationCategories: _categories.values.toList(),
-          ),
-        ),
-        onDidReceiveNotificationResponse: (response) async {
-          await _onResponse?.call(_convert(response));
-        },
-        onDidReceiveBackgroundNotificationResponse:
-            fcmActionsBackgroundNotificationResponse,
-      );
+  Future<void> _initializePlugin({required bool requestPermission}) {
+    final darwin = DarwinInitializationSettings(
+      requestAlertPermission: requestPermission,
+      requestBadgePermission: requestPermission,
+      requestSoundPermission: requestPermission,
+      notificationCategories: _categories.values.toList(),
+    );
+    return _plugin.initialize(
+      settings: InitializationSettings(
+        android: AndroidInitializationSettings(_icon),
+        iOS: darwin,
+        macOS: darwin,
+        web: const WebInitializationSettings(),
+      ),
+      onDidReceiveNotificationResponse: (response) async {
+        await _onResponse?.call(_convert(response));
+      },
+      onDidReceiveBackgroundNotificationResponse:
+          fcmActionsBackgroundNotificationResponse,
+    );
+  }
 
   @override
   Future<void> createChannels(Iterable<NotificationChannel> channels) async {
@@ -124,6 +128,15 @@ final class FlutterLocalNotificationsGateway
   ) async {
     await registerCategories(<NotificationMessage>[message]);
     final androidActions = message.actions.map(_androidAction).toList();
+    final darwin = DarwinNotificationDetails(
+      categoryIdentifier: message.categoryId,
+      presentAlert: !message.silent,
+      presentBanner: !message.silent,
+      presentList: !message.silent,
+      presentSound: channel.playSound && !message.silent,
+      sound: channel.sound,
+      presentBadge: channel.showBadge,
+    );
     await _plugin.show(
       id: message.notificationId,
       title: message.title,
@@ -149,14 +162,21 @@ final class FlutterLocalNotificationsGateway
           actions: androidActions,
           dismissIsolate: NotificationDismissedIsolate.main,
         ),
-        iOS: DarwinNotificationDetails(
-          categoryIdentifier: message.categoryId,
-          presentAlert: !message.silent,
-          presentBanner: !message.silent,
-          presentList: !message.silent,
-          presentSound: channel.playSound && !message.silent,
-          sound: channel.sound,
-          presentBadge: channel.showBadge,
+        iOS: darwin,
+        macOS: darwin,
+        web: WebNotificationDetails(
+          isSilent: message.silent,
+          imageUrl: message.imageUrl == null
+              ? null
+              : Uri.tryParse(message.imageUrl!),
+          actions: message.actions
+              .map(
+                (action) => WebNotificationAction(
+                  action: action.id,
+                  title: action.title,
+                ),
+              )
+              .toList(),
         ),
       ),
     );

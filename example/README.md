@@ -2,7 +2,7 @@
 
 The example demonstrates chat replies, incoming-call actions, order actions,
 runtime custom actions, route mapping, deep links, background callbacks, silent
-payloads, and local data-message fallback.
+payloads, local data-message fallback, and FCM token logging.
 
 ## Configure
 
@@ -50,20 +50,3 @@ To test terminated-state iOS actions, register the corresponding category
 during initialization and send its category in the APNs payload. Dynamic action
 sets sent only in FCM data cannot be read by Dart before an OS-rendered remote
 notification appears.
-# fcm_actions_example
-
-A new Flutter project.
-
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.

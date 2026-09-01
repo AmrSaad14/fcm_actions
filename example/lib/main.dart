@@ -31,7 +31,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   Object? initializationError;
   try {
-    await FcmActions.initialize(
+    final result = await FcmActions.initialize(
       navigatorKey: navigatorKey,
       actions: const <NotificationAction>[
         replyAction,
@@ -47,6 +47,11 @@ Future<void> main() async {
       onAction: (event, data) async =>
           _log('action=${event.actionId} reply=${event.replyText ?? '-'}'),
     );
+    _log(
+      'initialized authorized=${result.authorized} '
+      'token=${result.token ?? '-'}',
+    );
+    FcmActions.onTokenRefresh.listen((token) => _log('token refresh=$token'));
     FcmActions.registerAction(
       archiveAction,
       handler: (event) async => _log('Archived ${event.message.messageId}'),

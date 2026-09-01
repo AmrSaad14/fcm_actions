@@ -23,7 +23,9 @@ flowchart TD
     MessagingGateway --> Engine
     Engine --> LocalGateway[LocalNotificationsGateway]
     LocalGateway --> Android[Android channels and actions]
-    LocalGateway --> IOS[iOS categories and actions]
+    LocalGateway --> Apple[iOS and macOS categories]
+    LocalGateway --> Web[Web notifications]
+    Engine --> Token[FCM token and topics]
 
     FCM --> Background[Background dispatcher]
     Background --> Queue
