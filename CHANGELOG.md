@@ -1,3 +1,8 @@
+## 1.0.2
+
+- Raised minimum supported `firebase_core` to `^5.0.0` and `firebase_messaging`
+  to `^17.0.0` so pub.dev dependency scoring stays current.
+
 ## 1.0.1
 
 - Restored full pub.dev platform points by keeping `flutter_local_notifications`
